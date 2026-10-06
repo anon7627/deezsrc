@@ -33,7 +33,8 @@ account (`USER.USER_ID`, 0 when the `arl` is not accepted), its public name
 (`BLOG_NAME`), the subscription (`OFFER_NAME`), `checkForm` (the
 `api_token` of later calls, tied to the `sid` cookie set in the same
 answer) and `USER.OPTIONS`: `license_token`, `web_lossless` /
-`mobile_lossless` (FLAC allowed), `web_hq` / `mobile_hq` (MP3 320 allowed).
+`mobile_lossless` / `lossless` (FLAC allowed), `web_hq` / `mobile_hq` /
+`hq` (MP3 320 allowed).
 The session is opened on first use and again after an hour. When the
 gateway refuses the `api_token` (`VALID_TOKEN_REQUIRED`, or a
 `GATEWAY_ERROR` about the token), the session is opened again and the call
@@ -111,8 +112,8 @@ plugin sends `auth.changed {state: "expired"}` once.
 | Track | public `track/<id>` |
 | Playlist and its tracks | gateway `playlist.getData`, `playlist.getSongs` (`start`, `nb`), which also read private playlists |
 | Charts | public `chart/0/tracks`, `albums`, `artists`, `playlists` |
-| New releases | public `editorial/0/releases` |
-| Genres, their new releases | public `genre` (genre 0, "All", left out), `editorial/<id>/releases` |
+| New releases | public `editorial/0/selection` (new albums picked by Deezer's editors: one short list, `index` and `limit` ignored, cut into pages here; `editorial/<id>/releases` answers nothing any more) |
+| Genres, their new releases | public `genre` (genre 0, "All", left out), `editorial/<id>/selection` |
 | Similar artists | public `artist/<id>/related` |
 | Flow | gateway `radio.getUserRadio {USER_ID}` |
 | Track mix | gateway `song.getSearchTrackMix {SNG_ID}`; if it fails or is empty, the radio of the track's artist |

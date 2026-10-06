@@ -124,8 +124,8 @@ impl User {
             name: user.get("BLOG_NAME").and_then(Value::as_str).unwrap_or("").trim().to_string(),
             offer: offer.map(str::to_string),
             license_token: opts.get("license_token").and_then(Value::as_str).unwrap_or("").to_string(),
-            lossless: flag("web_lossless") || flag("mobile_lossless"),
-            hq: flag("web_hq") || flag("mobile_hq"),
+            lossless: flag("web_lossless") || flag("mobile_lossless") || flag("lossless"),
+            hq: flag("web_hq") || flag("mobile_hq") || flag("hq"),
         })
     }
 }

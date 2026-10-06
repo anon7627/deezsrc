@@ -281,7 +281,8 @@ fn public_api(path: &str, q: &HashMap<String, String>) -> Response {
         "artist/20/radio" => list(json!([public_track(), {"id": 7, "title": "Prelude", "readable": true, "artist": {"id": 21, "name": "Sviatoslav Richter"}}])),
         "chart/0/albums" => list(json!([public_album()])),
         "chart/0/tracks" => list(json!([public_track()])),
-        "editorial/0/releases" | "editorial/132/releases" => list(json!([public_album()])),
+        // Ten albums, no total, `index` and `limit` ignored.
+        "editorial/0/selection" | "editorial/132/selection" => json!({"data": [public_album()]}),
         "genre" => list(json!([{"id": 0, "name": "Tous"}, {"id": 132, "name": "Pop", "picture_xl": "https://img/pop.jpg"}])),
         "genre/132" => json!({"id": 132, "name": "Pop", "picture_xl": "https://img/pop.jpg"}),
         _ => json!({"error": {"type": "DataException", "message": "no data", "code": 800}}),
@@ -580,7 +581,9 @@ async fn catalogue_browse_and_library() {
     let charts = host.ok("browse.list", json!({"ref": "charts"})).await;
     assert_eq!(refs(&charts["items"]), ["charts/tracks", "charts/albums", "charts/artists", "charts/playlists"]);
     assert_eq!(host.ok("browse.list", json!({"ref": "charts/albums"})).await["items"][0]["ref"], "album/10");
-    assert_eq!(host.ok("browse.list", json!({"ref": "releases"})).await["items"][0]["ref"], "album/10");
+    let releases = host.ok("browse.list", json!({"ref": "releases"})).await;
+    assert_eq!((refs(&releases["items"]), releases["has_more"].as_bool()), (vec!["album/10".to_string()], Some(false)));
+    assert_eq!(host.ok("browse.list", json!({"ref": "releases", "offset": 50})).await["items"], json!([]), "one short list");
     let genres = host.ok("browse.list", json!({"ref": "genres"})).await;
     assert_eq!(genres["items"], json!([{"ref": "genre/132", "kind": "folder", "title": "Pop", "art": "https://img/pop.jpg",
         "playable": false, "browsable": true}]), "not genre 0, \"All\"");

@@ -278,6 +278,15 @@ pub async fn mix(dz: &Deezer, seed: RadioSeed, id: &str) -> Result<Vec<Value>> {
     }
 }
 
+/// New albums picked by Deezer's editors, for all genres (`0`) or one:
+/// `editorial/<id>/selection`, a short list that ignores `index` and
+/// `limit` (`editorial/<id>/releases` answers nothing any more).
+async fn selection(dz: &Deezer, genre: &str, offset: u32, limit: u32) -> Result<Value> {
+    let v = dz.api(format!("editorial/{genre}/selection"), vec![]).await?;
+    let albums = v.get("data").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
+    Ok(items::slice(albums, offset, limit, |a| items::album(a, None)))
+}
+
 pub async fn list(dz: &Deezer, lib: &Library, p: ListParams) -> RpcResult {
     let (offset, limit) = (p.offset, clamp(p.limit));
     let page = match parse_ref(&p.reference)? {
@@ -309,10 +318,7 @@ pub async fn list(dz: &Deezer, lib: &Library, p: ListParams) -> RpcResult {
                 _ => items::page(&v, offset, limit, items::playlist),
             }
         }
-        Ref::Releases => {
-            let v = dz.api("editorial/0/releases", paged(offset, limit)).await?;
-            items::page(&v, offset, limit, |a| items::album(a, None))
-        }
+        Ref::Releases => selection(dz, "0", offset, limit).await?,
         Ref::Genres => {
             let v = dz.api("genre", vec![]).await?;
             // Genre 0 is "All".
@@ -326,10 +332,7 @@ pub async fn list(dz: &Deezer, lib: &Library, p: ListParams) -> RpcResult {
                 .collect();
             items::slice(&genres, offset, limit, items::genre)
         }
-        Ref::Genre(id) => {
-            let v = dz.api(format!("editorial/{id}/releases"), paged(offset, limit)).await?;
-            items::page(&v, offset, limit, |a| items::album(a, None))
-        }
+        Ref::Genre(id) => selection(dz, &id, offset, limit).await?,
         Ref::Album(id) => {
             let (album, tracks) =
                 tokio::try_join!(dz.api(format!("album/{id}"), vec![]), dz.api(format!("album/{id}/tracks"), paged(offset, limit)))?;
