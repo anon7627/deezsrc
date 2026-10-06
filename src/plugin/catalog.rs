@@ -477,3 +477,36 @@ pub async fn set_favorite(dz: &Deezer, lib: &Library, reference: &str, on: bool)
     items::note_favorite(tab.kind(), &id, on);
     Ok(Value::Null)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deezer::Endpoints;
+
+    /// Against Deezer: `DEEZSRC_ARL=<cookie> cargo test live_account --
+    /// --ignored --nocapture`. Reads the account's lists, Flow, a search, a
+    /// track mix and lyrics; prints counts only.
+    #[tokio::test]
+    #[ignore]
+    async fn live_account() {
+        let arl = std::env::var("DEEZSRC_ARL").expect("DEEZSRC_ARL");
+        let dz = Deezer::new(Endpoints::new(None, None, None)).with_arl(&arl);
+        let user = dz.user().await.unwrap();
+        items::set_user(Some(user.id));
+        let lib = Library::default();
+        for tab in Tab::ALL {
+            let page = tab_page(&dz, &lib, tab, 0, 5).await.unwrap();
+            println!("{}s: {} in all, first page {}", tab.kind(), page["total"], page["items"].as_array().unwrap().len());
+        }
+        let flow = flow(&dz).await.unwrap();
+        println!("Flow: {} tracks", flow.len());
+        let found = dz.api("search/track", q(&[("q", "daft punk".into()), ("limit", "1".into())])).await.unwrap();
+        let track = found.pointer("/data/0/id").map(|v| v.to_string()).expect("a track");
+        let mix = mix(&dz, RadioSeed::Track, &track).await.unwrap();
+        println!("track {track}: mix of {} tracks", mix.len());
+        match super::super::lyrics::get(&dz, &format!("track/{track}")).await {
+            Ok(l) => println!("lyrics: synced {}, plain {}", l.get("synced").is_some(), l.get("plain").is_some()),
+            Err(e) => println!("lyrics: {} {}", e.code, e.message),
+        }
+    }
+}

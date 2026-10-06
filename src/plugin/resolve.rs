@@ -251,6 +251,41 @@ pub async fn resolve(dz: &Deezer, relay: &Relay, reference: &str, output: &Outpu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::deezer::Endpoints;
+
+    /// Against Deezer: `DEEZSRC_ARL=<cookie> DEEZSRC_TRACK=<id>
+    /// DEEZSRC_OUT=<file> cargo test live_stream -- --ignored --nocapture`.
+    /// Resolves the track, downloads it through the relay, checks a range
+    /// against the whole file and writes the file, to check with `flac -t`
+    /// (or any player).
+    #[tokio::test]
+    #[ignore]
+    async fn live_stream() {
+        let env = |k: &str| std::env::var(k).unwrap_or_else(|_| panic!("{k}"));
+        let dz = Deezer::new(Endpoints::new(None, None, None)).with_arl(&env("DEEZSRC_ARL"));
+        let user = dz.user().await.unwrap();
+        println!("subscription: {:?}, FLAC {}, MP3 320 {}", user.offer, user.lossless, user.hq);
+        let relay = Relay::default();
+        let reference = format!("track/{}", env("DEEZSRC_TRACK"));
+        let (out, resolved) = resolve(&dz, &relay, &reference, &Output::default(), Quality::Flac).await.unwrap();
+        assert_eq!(out["delivery"], "proxied");
+        let url = out["url"].as_str().unwrap();
+        let resp = reqwest::get(url).await.unwrap();
+        let length: usize = resp.headers()["content-length"].to_str().unwrap().parse().unwrap();
+        let body = resp.bytes().await.unwrap();
+        assert_eq!(body.len(), length);
+        if resolved.format == "FLAC" {
+            assert!(body.starts_with(b"fLaC"), "not a FLAC file");
+        } else {
+            assert!(body.starts_with(b"ID3") || body[0] == 0xff, "not an MP3 file");
+        }
+        let (a, b) = (length / 3 + 5, length / 3 + 70_000);
+        let part = reqwest::Client::new().get(url).header("range", format!("bytes={a}-{b}")).send().await.unwrap();
+        assert_eq!(part.status(), 206);
+        assert!(part.bytes().await.unwrap() == body[a..=b], "a range matches the whole file");
+        std::fs::write(env("DEEZSRC_OUT"), &body).unwrap();
+        println!("{} {:?}, {} bytes", resolved.format, out["format"], body.len());
+    }
 
     fn user(lossless: bool, hq: bool) -> User {
         User { id: 1, name: "a".into(), offer: None, license_token: "lt".into(), lossless, hq }
