@@ -1,0 +1,31 @@
+[package]
+name = "deezsrc"
+version = "0.1.0"
+edition = "2021"
+description = "Deezer source plugin (JSON-RPC over stdio): catalogue, sign-in with the arl cookie, stream resolution through a local decrypting relay"
+license = "MIT"
+repository = "https://github.com/anon7627/deezsrc"
+
+[[bin]]
+name = "deezsrc"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+axum = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+uuid = { version = "1", features = ["v4"] }
+md-5 = "0.10"
+blowfish = "0.9"
+cbc = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
