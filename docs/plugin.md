@@ -275,6 +275,9 @@ sources.
    (`[{code, message}]`, e.g. 2002 "Track token has no sufficient rights
    on requested media"): Deezer refuses the track, for the region or the
    plan.
+   An answer with `errors` but no `data` refuses the request as a whole
+   (an expired license token, say): the session is opened again and the
+   request sent once more.
 4. **Fallback.** A refused song with a `FALLBACK.SNG_ID` (another version
    of the same track, e.g. another release) is tried the same way; the
    relay then serves that song, with its own key. Still refused:
@@ -379,8 +382,8 @@ Covered:
   file through the relay, whole and in ranges at arbitrary offsets (inside
   an encrypted chunk, across chunks, the short last chunk), compared with
   the plain file; `HEAD`, `416`, an unknown token (`410`); a fallback
-  version; a refused track; a song without sizes; an output without
-  44.1 kHz;
+  version; a refused track; a song without sizes; a refused license token;
+  an output without 44.1 kHz;
 - playlist edits, and refusal on a playlist the account does not own;
 - play reports (on, then turned off);
 - rate limits: the quota error and HTTP 429;

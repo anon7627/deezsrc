@@ -193,6 +193,10 @@ async fn decrypted(shared: &Shared, entry: &Entry, start: u64, end: u64) -> Resu
         .await
         .map_err(|e| (StatusCode::BAD_GATEWAY, anyhow::Error::from(e.without_url()).context("CDN request")))?;
     let status = resp.status().as_u16();
+    let total = resp.headers().get(reqwest::header::CONTENT_RANGE).and_then(|v| v.to_str().ok()?.rsplit('/').next()?.trim().parse::<u64>().ok());
+    if total.is_some_and(|t| t != entry.stream.size) {
+        tracing::warn!("relay: track {}: the CDN file has {total:?} bytes, Deezer announced {}", entry.stream.track_id, entry.stream.size);
+    }
     let served_from = match status {
         206 => content_range_start(resp.headers()).unwrap_or(from),
         // The whole file: the CDN ignored the range.

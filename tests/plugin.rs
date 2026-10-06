@@ -73,6 +73,8 @@ struct Mock {
     token_gen: AtomicU64,
     /// Whether the subscription includes FLAC.
     no_lossless: AtomicBool,
+    /// Refuse the next `get_url` as a whole (an expired license token).
+    refuse_license: AtomicBool,
 }
 
 type Shared = Arc<Mock>;
@@ -294,6 +296,9 @@ fn media(mock: &Mock, headers: &HeaderMap, body: &str) -> Response {
     let req: Value = serde_json::from_str(body).unwrap();
     mock.record("media:get_url".into(), req.clone());
     assert_eq!(req["license_token"], LICENSE, "the account's license token");
+    if mock.refuse_license.swap(false, Ordering::SeqCst) {
+        return Json(json!({"errors": [{"code": 1000, "message": "Invalid license token"}]})).into_response();
+    }
     let host = headers.get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or_default();
     let token = req["track_tokens"][0].as_str().unwrap_or_default();
     let id = token.strip_prefix("tt-").unwrap_or_default();
@@ -767,6 +772,13 @@ async fn resolve_and_relay() {
     assert_eq!(last_formats(&mock), ["MP3_320", "MP3_128"], "no FLAC without the plan");
     mock.no_lossless.store(false, Ordering::SeqCst);
     mock.token_gen.fetch_add(1, Ordering::SeqCst);
+
+    // The license token refused: a new session, then the track plays.
+    host.ok("browse.list", json!({"ref": "playlist/100"})).await; // the session opened again after the bump above
+    mock.refuse_license.store(true, Ordering::SeqCst);
+    let opened = mock.count("gw:deezer.getUserData");
+    host.ok("track.resolve", json!({"ref": "track/1", "purpose": "play"})).await;
+    assert_eq!(mock.count("gw:deezer.getUserData"), opened + 1);
 
     // An output without 44.1 kHz: nothing fits.
     host.notify("output.changed", json!({"output": {"max_rate": 48000, "rates": [48000]}})).await;

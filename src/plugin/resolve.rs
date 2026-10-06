@@ -191,10 +191,20 @@ pub async fn resolve(dz: &Deezer, relay: &Relay, reference: &str, output: &Outpu
         let names: Vec<&str> = formats.iter().map(|q| q.format()).collect();
         let refusal = match current.get("TRACK_TOKEN").and_then(Value::as_str).filter(|t| !t.is_empty()) {
             None => vec![json!({"message": "no track token"})],
-            Some(token) => match media_of(&dz.get_url(token, &names).await?) {
-                Media::Url { url, quality, exp } => break (current, url, quality, exp),
-                Media::Refused(errors) => errors,
-            },
+            Some(token) => {
+                let mut answer = dz.get_url(token, &names).await?;
+                if answer.get("errors").is_some() && answer.get("data").is_none() {
+                    // The whole request refused, not the track: the license
+                    // token may have expired. Once more with a new session.
+                    tracing::info!("media service refused the request; opening the session again");
+                    dz.refresh().await?;
+                    answer = dz.get_url(token, &names).await?;
+                }
+                match media_of(&answer) {
+                    Media::Url { url, quality, exp } => break (current, url, quality, exp),
+                    Media::Refused(errors) => errors,
+                }
+            }
         };
         let fallback = current.pointer("/FALLBACK/SNG_ID").and_then(|f| items::text(&json!({"id": f}), "id"));
         let song_id = items::id_at(&current, "SNG_ID").unwrap_or_default();
